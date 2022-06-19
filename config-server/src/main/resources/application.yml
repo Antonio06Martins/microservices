@@ -7,9 +7,9 @@ spring:
     config:
       server:
         git:
-          uri: https://github.com/leandrocgsi/config-server
+          uri: https://github.com/Antonio06Martins/config-server
           #username: username
           #password: password
-          default-label: main
+          default-label: master
           search-paths:
             - 'greeting-service*'
