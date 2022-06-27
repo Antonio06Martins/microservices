@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+
+  mysql:
+    image: mysql:8.0.20
+    container_name: mysqlbook
+    ports:
+      - 3307:3306
+    environment:
+      MYSQL_USER: book
+      MYSQL_PASSWORD: book123
+      MYSQL_ROOT_PASSWORD: book123
+      MYSQL_DATABASE: book_service
