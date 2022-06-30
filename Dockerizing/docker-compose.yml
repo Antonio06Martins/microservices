@@ -5,3 +5,146 @@ services:
     image: openzipkin/zipkin:2.23.2
     ports:
       - 9411:9411
+    restart: always
+    depends_on:
+      - rabbit-mq
+    environment:
+      RABBIT_URI: amqp://guest:guest@rabbit-mq:5672
+    networks:
+      - martins-network
+
+  rabbit-mq:
+    image: rabbitmq:3.8.14-management
+    ports:
+      - 5672:5672
+      - 15672:15672
+    networks:
+      - martins-network
+
+  cambio-db:
+    image: mysql:8.0.22
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      TZ: America/Sao_Paulo
+      MYSQL_ROOT_PASSWORD: cambio123
+      MYSQL_USER: cambio
+      MYSQL_PASSWORD: cambio123
+      MYSQL_DATABASE: cambio_service
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_TCP_PORT: 3306
+    ports:
+      - 3306:3306
+    expose:
+      - 3306
+    networks:
+      - martins-network
+      
+  book-db:
+    image: mysql:8.0.20
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      TZ: America/Sao_Paulo
+      MYSQL_ROOT_PASSWORD: book123
+      MYSQL_USER: book
+      MYSQL_PASSWORD: book123
+      MYSQL_DATABASE: book_service
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_TCP_PORT: 3307
+    ports:
+      - 3307:3307
+    expose:
+      - 3307
+    networks:
+      - martins-network
+
+  naming-server:
+    image: antonio06martins/naming-server
+    restart: always
+    build:
+      context: .
+      dockerfile: naming-server/Dockerfile
+    ports:
+      - 8761:8761
+    networks:
+      - martins-network
+
+  api-gateway:
+    image: antonio06martins/api-gateway
+    restart: always
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    ports:
+      - 8765:8765
+    depends_on:
+      - naming-server
+      - rabbit-mq
+    environment:
+      EUREKA.CLIENT.SERVICEURL.DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING.ZIPKIN.BASEURL: http://zipkin-server:9411/
+      RABBIT_URI: amqp://guest:guest@rabbit-mq:5672
+      SPRING_RABBITMQ_HOST: rabbit-mq
+      SPRING_ZIPKIN_SENDER_TYPE: rabbit
+    networks:
+      - martins-network
+
+  cambio-service:
+    image: antonio06martins/cambio-service
+    restart: always
+    build:
+      context: .
+      dockerfile: cambio-service/Dockerfile
+    environment:
+      TZ: America/Sao_Paulo
+      EUREKA.CLIENT.SERVICEURL.DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING.ZIPKIN.BASEURL: http://zipkin-server:9411/
+      RABBIT_URI: amqp://guest:guest@rabbit-mq:5672
+      SPRING_RABBITMQ_HOST: rabbit-mq
+      SPRING_ZIPKIN_SENDER_TYPE: rabbit
+      SPRING.DATASOURCE.URL: jdbc:mysql://cambio-db:3306/cambio_service?useSSL=false&serverTimezone=UTC&enabledTLSProtocols=TLSv1.2
+      SPRING.DATASOURCE.USERNAME: cambio
+      SPRING.DATASOURCE.PASSWORD: cambio123
+      SPRING.FLYWAY.URL: jdbc:mysql://cambio-db:3306/cambio_service?useSSL=false&serverTimezone=UTC&enabledTLSProtocols=TLSv1.2
+      SPRING.FLYWAY.USER: cambio
+      SPRING.FLYWAY.PASSWORD: cambio123
+    ports:
+      - 8000:8000
+    depends_on:
+      - naming-server
+      - cambio-db
+      - rabbit-mq
+    networks:
+      - martins-network
+      
+  book-service:
+    image: antonio06martins/book-service
+    restart: always
+    build:
+      context: .
+      dockerfile: book-service/Dockerfile
+    environment:
+      TZ: America/Sao_Paulo
+      EUREKA.CLIENT.SERVICEURL.DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING.ZIPKIN.BASEURL: http://zipkin-server:9411/
+      RABBIT_URI: amqp://guest:guest@rabbit-mq:5672
+      SPRING_RABBITMQ_HOST: rabbit-mq
+      SPRING_ZIPKIN_SENDER_TYPE: rabbit
+      SPRING.DATASOURCE.URL: jdbc:mysql://book-db:3307/book_service?useSSL=false&serverTimezone=UTC&enabledTLSProtocols=TLSv1.2
+      SPRING.DATASOURCE.USERNAME: book
+      SPRING.DATASOURCE.PASSWORD: book123
+      SPRING.FLYWAY.URL: jdbc:mysql://book-db:3307/book_service?useSSL=false&serverTimezone=UTC&enabledTLSProtocols=TLSv1.2
+      SPRING.FLYWAY.USER: book
+      SPRING.FLYWAY.PASSWORD: book123
+    ports:
+      - 8100:8100
+    depends_on:
+      - naming-server
+      - book-db
+      - rabbit-mq
+    networks:
+      - martins-network
+networks:
+  martins-network:
+    driver: bridge

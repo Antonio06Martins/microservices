@@ -32,6 +32,7 @@ public class BookController {
             @PathVariable("id") Long id,
             @PathVariable("currency") String currency
     ) {
+
         var book = repository.getById(id);
         if (book == null) throw new RuntimeException("Book not Found");
 
